@@ -1,0 +1,79 @@
+{
+  "task": "code-eval",
+  "condition": "skills-auto",
+  "role": "eval",
+  "error": null,
+  "timestamp": "2026-10-06T18:10:33.221911+00:00",
+  "skills_sha256": "65388025c18c4d5d5f5c4bd2aaabd0bcc98cce158071955894a5d57ec1053689",
+  "seconds": 74.2,
+  "tokens": {
+    "input": 178970,
+    "output": 2985,
+    "total": 181955
+  },
+  "tool_calls": 26,
+  "subagent_calls": 1,
+  "skills_read": 2,
+  "skills_modified": false,
+  "final_message": "I have fixed the issues in the `bookings` package so that all tests pass successfully, the specification in the docstrings is fully met, and type annotations and regression tests are in place.\n\n### Summary of Changes:\n- **`workspace/bookings/timeutil.py`**: Fixed `parse_duration` to correctly parse all documented formats (`\"1h30m\"`, `\"2h\"`, `\"45m\"`, `\"1:30\"`, and bare minutes `\"45\"`).\n- **`workspace/bookings/billing.py`**: Updated `billable_blocks` to round up using `math.ceil` and added validation to raise `ValueError` when `minutes < 0`.\n- **`workspace/bookings/schedule.py`**: Fixed `add_slot` to avoid mutable default argument shared state across calls.\n- **Type Annotations**: Added comprehensive type annotations to all public functions across `bookings/billing.py`, `bookings/calendar_export.py`, `bookings/schedule.py`, and `bookings/timeutil.py`.\n- **Tests & Changelog**: Added comprehensive regression tests in `workspace/tests/test_regressions.py` and updated `workspace/CHANGELOG.md` under `## Unreleased`.",
+  "score": 0.9090909090909091,
+  "passed": 10,
+  "total": 11,
+  "checks": [
+    {
+      "name": "visible_suite_passes",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "tests_not_modified",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "parse_duration_all_formats",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "other_caller_fixed",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "billable_blocks_round_up",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "add_slot_no_shared_state",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "negative_minutes_rejected",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "rule_type_hints",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "rule_regression_tests",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "rule_changelog",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "rule_version_bump",
+      "passed": false,
+      "detail": ""
+    }
+  ]
+}
