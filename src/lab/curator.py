@@ -4,10 +4,12 @@ Pseudo-code: guides/pseudocode/04_curator.md
 Kiểm tra:    pytest tests/test_04_curator.py
 Chạy thật:   python -m lab.curator
 """
+import json
 import re
 from pathlib import Path
 
-from .tasks import eval_markers   # có sẵn: định danh của tác vụ đánh giá, tính lúc chạy
+from .model import make_model
+from .tasks import ROOT, eval_markers   # có sẵn: định danh của tác vụ đánh giá, tính lúc chạy
 
 # ---- CÓ SẴN, KHÔNG SỬA: kiểm tra và tách khối skill (phần dễ sai và liên quan bảo mật) ----------------
 SAFE_NAME = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
@@ -68,7 +70,107 @@ def curate_skills(results_dir="results", source_condition="baseline", out_dir=No
     model mặc định: make_model() (lab.model).
     Trả về: danh sách đường dẫn SKILL.md đã ghi.
     """
-    raise NotImplementedError("TODO: cài đặt curate_skills (xem guides/pseudocode/04_curator.md)")
+    target_out_dir = Path(out_dir) if out_dir is not None else (ROOT / "skills" / "auto")
+    cond_dir = Path(results_dir) / source_condition
+
+    runs_with_failures = []
+    if cond_dir.exists():
+        for task_path in sorted(cond_dir.iterdir()):
+            run_file = task_path / "run.json"
+            if not run_file.exists():
+                continue
+            try:
+                r = json.loads(run_file.read_text(encoding="utf-8"))
+            except Exception:
+                continue
+
+            if r.get("role") != "learn":
+                continue
+
+            failed_checks = []
+            for c in r.get("checks", []):
+                if not c.get("passed"):
+                    failed_checks.append((c.get("name", "unknown"), c.get("detail", "")))
+
+            if not failed_checks:
+                continue
+
+            trace_file = task_path / "trace.md"
+            trace_content = ""
+            if trace_file.exists():
+                try:
+                    full_trace = trace_file.read_text(encoding="utf-8")
+                    trace_content = full_trace[-6000:]
+                except Exception:
+                    trace_content = ""
+
+            runs_with_failures.append({
+                "task": r.get("task", task_path.name),
+                "failed_checks": failed_checks,
+                "trace": trace_content,
+            })
+
+    if not runs_with_failures:
+        print("Cảnh báo: không có check thất bại ở tác vụ học")
+        return []
+
+    sections = []
+    for r in runs_with_failures:
+        checks_text = "\n".join(f"- Check '{name}': {detail}" for name, detail in r["failed_checks"])
+        sections.append(
+            f"### Task: {r['task']}\n"
+            f"Failed checks:\n{checks_text}\n"
+            f"Trace excerpt:\n```\n{r['trace']}\n```"
+        )
+
+    prompt = (
+        f"You are curating procedural skills for an engineering and data agent.\n"
+        f"Below are the failed checks (check name and evaluation feedback/rule) and execution traces from learning tasks.\n"
+        f"Identify common procedural gaps, organizational rule violations, or missing verification steps.\n"
+        f"Write at most {max_skills} concise skills to prevent these failures in similar tasks.\n\n"
+        f"Rules for skills:\n"
+        f"- Skills must be general: do not mention specific learning task IDs, specific input filenames, or benchmark numbers.\n"
+        f"- Standard organizational conventions (e.g. Acme naming rules like clean.csv, meta fields, regression tests) ARE general conventions.\n"
+        f"- Each skill must have YAML frontmatter with 'name' (lowercase alphanumeric with hyphens, max 64 chars) and 'description' (one sentence: WHEN to use this skill).\n"
+        f"- Body should be actionable instructions or a checklist (maximum 40 lines).\n"
+        f"- Format each skill strictly as:\n"
+        f"=== SKILL: <name> ===\n"
+        f"---\n"
+        f"name: <name>\n"
+        f"description: <when to use>\n"
+        f"---\n"
+        f"<skill body>\n"
+        f"=== END ===\n\n"
+        f"Failed learning runs:\n"
+        + "\n\n".join(sections)
+    )
+
+    chat_model = model or make_model()
+    res = chat_model.invoke(prompt)
+    content = res.content
+    if isinstance(content, list):
+        reply_text = "".join(str(part.get("text", part)) if isinstance(part, dict) else str(part) for part in content)
+    else:
+        reply_text = str(content)
+
+    blocks = parse_skill_blocks(reply_text)
+    written = []
+
+    for name, skill_text in blocks:
+        if len(written) >= max_skills:
+            break
+        problems = validate_skill(skill_text, expected_name=name)
+        if problems:
+            print(f"Skipping skill '{name}': {', '.join(problems)}")
+            continue
+
+        skill_dir = target_out_dir / name
+        skill_dir.mkdir(parents=True, exist_ok=True)
+        skill_file = skill_dir / "SKILL.md"
+        skill_file.write_text(skill_text.strip() + "\n", encoding="utf-8")
+        written.append(skill_file)
+
+    return written
 
 
 if __name__ == "__main__":
